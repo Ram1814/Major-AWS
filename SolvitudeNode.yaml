@@ -1,0 +1,162 @@
+---
+Parameters:
+  # SecurityGroupDescription:
+  #   Description: Security Group Description
+  #   Type: String
+  # VPCId:
+  #   Description: VPC to create the security group into
+  #   Type: AWS::EC2::VPC::Id  
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64'
+  GitCloneLink:
+    Description: Provide the clone link for your version controlled repository
+    Type: String    
+    MinLength: 1
+  RepoName:
+    Description: Provide the exact name of your repository
+    Type: String    
+    MinLength: 1
+  MongoURI:
+    Type: String
+          
+
+Resources: 
+  Parameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /my/secure/string
+      Type: SecureString
+      Value: !Ref MongoURI
+  TestServer:
+    Type: AWS::EC2::Instance
+    Properties: 
+      AvailabilityZone: us-east-1a
+      ImageId: !Ref LatestAmiId
+      InstanceType: t2.micro
+      KeyName: EC2_Tutorial       
+      SecurityGroups:
+        - !Ref SSHSecurityGroup
+        - !Ref ServerSecurityGroup      
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          sudo su
+          sudo yum install -y nodejs
+          sudo yum install -y git
+          sudo yum install -y nginx
+          sudo systemctl enable nginx
+          sudo systemctl start nginx
+          systemctl status nginx
+          cd /usr/share/nginx/html
+          git clone ${GitCloneLink}           
+          cd ${RepoName}
+          sudo echo "${MongoURI}" >> .env
+          npm install
+          npm install -g pm2 
+          pm2 start app.js --name=${RepoName}
+          pm2 save     
+          pm2 startup
+
+
+          cd /etc/nginx/
+
+          sudo su
+          rm -f nginx.conf 
+
+          sudo echo "user nginx;
+          worker_processes auto;
+          error_log /var/log/nginx/error.log notice;
+          pid /run/nginx.pid;
+
+          # Load dynamic modules. See /usr/share/doc/nginx/README.dynamic.
+          include /usr/share/nginx/modules/*.conf;
+
+          events {
+              worker_connections 1024;
+          }
+
+          http {
+              log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                                '$status $body_bytes_sent "$http_referer" '
+                                '"$http_user_agent" "$http_x_forwarded_for"';
+
+              access_log  /var/log/nginx/access.log  main;
+
+              sendfile            on;
+              tcp_nopush          on;
+              keepalive_timeout   65;
+              types_hash_max_size 4096;
+
+              include             /etc/nginx/mime.types;
+              default_type        application/octet-stream;
+                include /etc/nginx/conf.d/*.conf;
+
+              server {
+                  listen       80;
+                  listen       [::]:80;
+                  server_name  _;
+                  location / {
+                  proxy_pass http://localhost:3000;
+                }
+
+              }
+          }   " >> nginx.conf
+
+
+                
+
+
+          sudo nginx -t
+          sudo service nginx restart
+          cd /usr/share/nginx/html/${RepoName}
+          pm2 start app.js --name=${RepoName}
+
+
+
+  # First EC2 security group
+  SSHSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+      - CidrIp: 0.0.0.0/0
+        FromPort: 22
+        IpProtocol: tcp
+        ToPort: 22
+    
+    # Second EC2 security group    
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: MainServerSecurityGroup
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 192.168.1.1/32  
+      
+      
+             
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
