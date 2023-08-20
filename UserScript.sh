@@ -71,12 +71,6 @@ sudo service nginx restart
 
 
 
-
-
-MONGO_URI = mongodb+srv://Ram1814:ram2002@mycluster.izl3iaq.mongodb.net/MyTaskAPI?retryWrites=true&w=majority
-
-https://github.com/Ram1814/TaskManager-API.git
-
 # cd /usr/share/nginx/html/My-chat
 #  sudo nano /etc/nginx/nginx.conf
 # cd /etc/nginx
